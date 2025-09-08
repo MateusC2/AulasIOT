@@ -7,9 +7,9 @@ void handleTemperatura(AdafruitIO_Data *data) {
   Serial.println(F("°C"));
 
   //Logica para acender ou não o led
-  if(temp <= 0){
+  if (temp <= 0) {
     digitalWrite(pinLed, HIGH);
-  }else{
+  } else {
     digitalWrite(pinLed, LOW);
   }
 }
