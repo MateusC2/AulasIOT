@@ -10,7 +10,7 @@
 #define IO_USERNAME ""
 #define IO_KEY ""
 
-// AdafruitIO_WiFi io(IO_USERNAME, IO_KEY, WIFI_SSID, WIFI_PASS);
+AdafruitIO_WiFi io(IO_USERNAME, IO_KEY, WIFI_SSID, WIFI_PASS);
 
 
 #define pinNTC 34
@@ -24,7 +24,8 @@
 
 //Configuração do ultrassonico
 #define MAX_DISTANCE 100
-NewPing sonar(TRIG_PIN,ECHO_PIN,MAX_DISTANCE);
+NewPing sonar(TRIG_PIN, ECHO_PIN, MAX_DISTANCE);
+
 
 //Controle de envio de dados
 float temp_atual = 0;
@@ -32,6 +33,7 @@ float temp_anterior = -1;
 
 //Variavel / ponteiro para referenciar o feed temperatura
 // AdafruitIO_Feed *temperatura = io.feed("temperatura");
+AdafruitIO_Feed *botaoalarme = io.feed("botaoalarme");
 
 
 
@@ -41,6 +43,11 @@ const float Beta = 3950.0;       // Constante Beta do NTC (fornecida pelo fabric
 const float R0 = 10000.0;        // Resistência nominal do NTC a 25°C (ohms)
 const float T0_kelvin = 298.15;  // 25°C em Kelvin
 const float Vcc = 3.3;           // Tensão de alimentação do divisor (ESP32 = 3,3V)
+
+// Variaveis de controle
+bool alarmeAtivo = false;
+unsigned int distancia = 0;
+const int LIMITE_DISTANCIA = 15;
 
 
 
@@ -56,21 +63,25 @@ void setup() {
 
   while (!Serial)
     ;
-  // Serial.print("Conectando ao Adafruit IO");
-  // io.connect();
+  Serial.print("Conectando ao Adafruit IO");
+  io.connect();
 
-  // while (io.status() < AIO_CONNECTED) {
-  //   Serial.print(".");
-  //   delay(500);
-  // }
+  while (io.status() < AIO_CONNECTED) {
+    Serial.print(".");
+    delay(500);
+  }
 
   // Serial.println();
   // Serial.println(io.statusText());
 
   // //Configuração do callback, quando o feed receber(atualizar) um valor
   // temperatura->onMessage(handleTemperatura);
+  botaoalarme->onMessage(handleAlarme);
   // //Registra a função de callback
   // //Ela será chamada sempre que o feed receber um novo dado
+
+  Serial.print("Solicitando o estado incial do alarme: ");
+  botaoalarme->get();
 
   delay(1000);
 }
@@ -84,8 +95,8 @@ void loop() {
   // Serial.println(sonar.ping_cm());
   // delay(500);
 
-  // //Manter a conexão com o Adafruit IO ativa
-  // io.run();
+  //Manter a conexão com o Adafruit IO ativa
+  io.run();
 
   // publicacao();  //Chamada da função publish
 
@@ -93,4 +104,26 @@ void loop() {
   // // Serial.println(analogRead(pinNTC));
 
   // delay(3000);
+
+  //Leitura do botão fisico
+  if (digitalRead(BOTAO_FISICO) == 1) {
+    delay(200);  // debounce simples
+    alarmeAtivo = !alarmeAtivo;
+
+    botaoalarme->save(String(alarmeAtivo ? "true" : "false"));
+    Serial.println(alarmeAtivo ? F("Alarme ARMADO pelo botao fisico") : F("Alarme DESARMADO pelo botao fisico"));
+  }
+
+  distancia = sonar.ping_cm();
+  Serial.print("Distancia lida: ");
+  Serial.println(distancia);
+  Serial.print("cm");
+
+  //Ativação ou Desativação do alarme
+  if(alarmeAtivo && distancia > 0 && distancia < LIMITE_DISTANCIA){
+    ativarAlerta();
+  }
+  else{
+    desligarAlerta();
+  }
 }
